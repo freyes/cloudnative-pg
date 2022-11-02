@@ -17,8 +17,6 @@ limitations under the License.
 package specs
 
 import (
-	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -52,7 +50,7 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 // to the manager inside the generated pod.
 func addManagerLoggingOptions(cluster apiv1.Cluster, container *corev1.Container) {
 	if cluster.Spec.LogLevel != "" {
-		container.Command = append(container.Command, fmt.Sprintf("--log-level=%s", cluster.Spec.LogLevel))
+		// container.Command = append(container.Command, fmt.Sprintf("--log-level=%s", cluster.Spec.LogLevel))
 	}
 }
 

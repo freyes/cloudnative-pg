@@ -214,7 +214,12 @@ func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
 func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCommand []string) *batchv1.Job {
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	jobName := GetJobName(cluster.Name, nodeSerial, role)
-
+	prefixHook := "until curl --head localhost:15000 ; do echo Waiting for Sidecar; sleep 3 ; done ; echo Sidecar available; "
+	suffixHook := "curl -X POST http://localhost:15000/quitquitquit"
+	command := []string{"/bin/bash"}
+	args := []string{"-c", "\"" + prefixHook + shellquote.Join(initCommand...)+ " ; " + suffixHook + "\""}
+	println(command)
+	println(args)
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -244,7 +249,8 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 							Image:           cluster.GetImageName(),
 							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 							Env:             createEnvVarPostgresContainer(cluster, instanceName),
-							Command:         initCommand,
+							Command:         command,
+							Args:            args,
 							VolumeMounts:    createPostgresVolumeMounts(cluster),
 							Resources:       cluster.Spec.Resources,
 							SecurityContext: CreateContainerSecurityContext(),
