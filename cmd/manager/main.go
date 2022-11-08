@@ -20,6 +20,7 @@ The manager command is the main entrypoint of CloudNativePG operator.
 package main
 
 import (
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/istio"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -60,6 +61,7 @@ func main() {
 	cmd.AddCommand(walrestore.NewCmd())
 	cmd.AddCommand(versions.NewCmd())
 	cmd.AddCommand(pgbouncer.NewCmd())
+	cmd.AddCommand(istio.NewCmd())
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)

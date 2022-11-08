@@ -24,6 +24,14 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+var (
+	initCommand = []string{
+		"/manager",
+		"bootstrap",
+		"/controller/manager",
+	}
+)
+
 // createBootstrapContainer creates the init container bootstrapping the operator
 // executable inside the generated Pods
 func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
@@ -31,11 +39,7 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 		Name:            BootstrapControllerContainerName,
 		Image:           configuration.Current.OperatorImageName,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-		Command: []string{
-			"/manager",
-			"bootstrap",
-			"/controller/manager",
-		},
+		Command:         initCommand,
 		VolumeMounts:    createPostgresVolumeMounts(cluster),
 		Resources:       cluster.Spec.Resources,
 		SecurityContext: CreateContainerSecurityContext(),
@@ -50,7 +54,7 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 // to the manager inside the generated pod.
 func addManagerLoggingOptions(cluster apiv1.Cluster, container *corev1.Container) {
 	if cluster.Spec.LogLevel != "" {
-		// container.Command = append(container.Command, fmt.Sprintf("--log-level=%s", cluster.Spec.LogLevel))
+		//container.Command = append(container.Command, fmt.Sprintf("--log-level=%s", cluster.Spec.LogLevel))
 	}
 }
 
