@@ -18,10 +18,11 @@ limitations under the License.
 package quit
 
 import (
-	istioproxy "github.com/allisson/go-istio-proxy-wait"
-	"github.com/spf13/cobra"
 	"net/http"
 	"time"
+
+	istioproxy "github.com/allisson/go-istio-proxy-wait"
+	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
@@ -32,7 +33,6 @@ func NewCmd() *cobra.Command {
 		Use:   "quit",
 		Short: "Quit istio sidecar if exist",
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
-
 			return quitSubCommand()
 		},
 	}
@@ -41,19 +41,20 @@ func NewCmd() *cobra.Command {
 }
 
 func quitSubCommand() error {
+	var err error
 	if isIstioReady() {
-
 		IstioQuitEndpoint := "http://localhost:15000/quitquitquit"
 
 		resp, err := http.Post(IstioQuitEndpoint, "", nil)
 		if err != nil {
 			log.Warning("Fail to quit istio-proxy")
 		}
-		defer resp.Body.Close()
-
+		defer func() {
+			err = resp.Body.Close()
+		}()
 	}
 	log.Warning("istio-proxy is not ready or is not enabled at all, no need to quit it")
-	return nil
+	return err
 }
 
 func isIstioReady() bool {
