@@ -214,11 +214,17 @@ func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
 func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCommand []string) *batchv1.Job {
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	jobName := GetJobName(cluster.Name, nodeSerial, role)
-	preStartHook := []string{"/bin/sleep", "5"}
-	// preStopHook := []string{"curl -X POST http://localhost:15000/quitquitquit"}
+
+	// Self customized preStop hook to quit Istio proxy
 	preStopHook := []string{"/controller/manager", "istio", "quit"}
 	command := []string{"/bin/sh"}
-	args := []string{"-c", shellquote.Join(preStartHook...) + " && " + shellquote.Join(initCommand...) + " && " + shellquote.Join(preStopHook...)}
+	initCommandWithLogSpec := initCommand
+	// Add customized log configuration if there's any
+	if cluster.Spec.LogLevel != "" {
+		initCommandWithLogSpec = append(initCommandWithLogSpec, fmt.Sprintf("--log-level=%s", cluster.Spec.LogLevel))
+	}
+	args := []string{"-c", shellquote.Join(initCommandWithLogSpec...) + " && " + shellquote.Join(preStopHook...)}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -269,7 +275,6 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 
 	utils.LabelJobRole(&job.ObjectMeta, role)
 	utils.LabelClusterName(&job.ObjectMeta, cluster.Name)
-	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
 	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
 		utils.AnnotateAppArmor(&job.ObjectMeta, cluster.Annotations)
 	}

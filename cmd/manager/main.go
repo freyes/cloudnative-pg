@@ -20,14 +20,13 @@ The manager command is the main entrypoint of CloudNativePG operator.
 package main
 
 import (
-	"crypto/tls"
 	"errors"
-	"fmt"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/istio"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"net"
-	"net/http"
 	"os"
 	"time"
 
@@ -47,7 +46,7 @@ import (
 )
 
 func main() {
-	if !isK8sRESTServerReady() {
+	if !isK8sRESTServerReadyWithRetries() {
 		log.Warning("The K8S REST API Server is not ready")
 		os.Exit(1)
 	}
@@ -79,14 +78,12 @@ func main() {
 	}
 }
 
-// isK8sRESTServerReady retrieves the healthiness of k8s REST API server, retrying
+// isK8sRESTServerReadyWithRetries attempts to retrieve the version of k8s REST API server, retrying
 // the request if some communication error is encountered
-func isK8sRESTServerReady() bool {
-	if time.Now().Minute()%2 == 0 {
-		panic("isK8sRESTServerReady")
-	}
-	// HealthinessCheckRetry is the default backoff used to query the healthiness of the k8s REST API Server
-	var healthinessCheckRetry = wait.Backoff{
+func isK8sRESTServerReadyWithRetries() bool {
+
+	// readinessCheckRetry is the default backoff used to query the healthiness of the k8s REST API Server
+	var readinessCheckRetry = wait.Backoff{
 		Steps:    10,
 		Duration: 10 * time.Millisecond,
 		Factor:   5.0,
@@ -104,38 +101,28 @@ func isK8sRESTServerReady() bool {
 		return true
 	}
 
-	KubernetesServiceHost := os.Getenv("KUBERNETES_SERVICE_HOST")
-	KubernetesServicePortHttps := os.Getenv("KUBERNETES_SERVICE_PORT_HTTPS")
-	if KubernetesServiceHost == "" {
-		log.Warning("Fail to get environment variable KUBERNETES_SERVICE_HOST")
-	}
-	if KubernetesServicePortHttps == "" {
-		log.Warning("Fail to get environment variable KUBERNETES_SERVICE_PORT_HTTPS")
-	}
-
-	k8sHealthCheckAPI := fmt.Sprintf("https://%s:%s/livez", KubernetesServiceHost, KubernetesServicePortHttps)
-
-	err := retry.OnError(healthinessCheckRetry, isErrorRetryable, func() error {
-		var err error = nil
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client := &http.Client{Transport: tr}
-
-		req, err := http.NewRequest("GET", k8sHealthCheckAPI, nil)
-		if err != nil {
-			log.Warning(fmt.Sprintf("Fail to create the request for: %s", k8sHealthCheckAPI))
-			return err
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Warning(fmt.Sprintf("Fail to request for: %s", k8sHealthCheckAPI))
-			return err
-		}
-		defer resp.Body.Close()
-		return nil
-	})
-
+	err := retry.OnError(readinessCheckRetry, isErrorRetryable, isK8sRESTServerReady)
 	return err == nil
+}
+
+// isK8sRESTServerReady attempts to retrieve the version of k8s REST API server to test the readiness of the k8s REST
+// API server.
+func isK8sRESTServerReady() error {
+
+	// creates the in-cluster config
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return err
+	}
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	_, err = clientset.DiscoveryClient.ServerVersion()
+	if err != nil {
+		return err
+	}
+	return nil
 }

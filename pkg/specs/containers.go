@@ -17,19 +17,12 @@ limitations under the License.
 package specs
 
 import (
+	"fmt"
 	corev1 "k8s.io/api/core/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-)
-
-var (
-	initCommand = []string{
-		"/manager",
-		"bootstrap",
-		"/controller/manager",
-	}
 )
 
 // createBootstrapContainer creates the init container bootstrapping the operator
@@ -39,7 +32,11 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 		Name:            BootstrapControllerContainerName,
 		Image:           configuration.Current.OperatorImageName,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-		Command:         initCommand,
+		Command: []string{
+			"/manager",
+			"bootstrap",
+			"/controller/manager",
+		},
 		VolumeMounts:    createPostgresVolumeMounts(cluster),
 		Resources:       cluster.Spec.Resources,
 		SecurityContext: CreateContainerSecurityContext(),
@@ -54,7 +51,7 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 // to the manager inside the generated pod.
 func addManagerLoggingOptions(cluster apiv1.Cluster, container *corev1.Container) {
 	if cluster.Spec.LogLevel != "" {
-		//container.Command = append(container.Command, fmt.Sprintf("--log-level=%s", cluster.Spec.LogLevel))
+		container.Command = append(container.Command, fmt.Sprintf("--log-level=%s", cluster.Spec.LogLevel))
 	}
 }
 
