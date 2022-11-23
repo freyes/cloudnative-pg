@@ -594,6 +594,9 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 		return fmt.Errorf("while parsing PVC size %v: %w", cluster.Spec.StorageConfiguration.Size, err)
 	}
 
+	// TODO: create a new pvc for wal volumes if a wal volume has been added to the cluster spec
+	// possibly use restoreCustomWalDir to copy the contents into the new pvc
+
 	for idx := range resources.pvcs.Items {
 		oldPVC := resources.pvcs.Items[idx].DeepCopy()
 		oldQuantity, ok := resources.pvcs.Items[idx].Spec.Resources.Requests["storage"]
@@ -754,6 +757,9 @@ func (r *ClusterReconciler) handleRollingUpdate(
 	// If we need to roll out a restart of any instance, this is the right moment
 	// Do I have to roll out a new image?
 	done, err := r.rolloutDueToCondition(ctx, cluster, &instancesStatus, IsPodNeedingRollout)
+
+	// TODO check if the walstorage was changed and do a rollout
+
 	if err != nil {
 		return ctrl.Result{}, err
 	}
