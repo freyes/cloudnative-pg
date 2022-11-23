@@ -19,6 +19,8 @@ package join
 
 import (
 	"context"
+	"fmt"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -88,6 +90,19 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 	if err != nil {
 		log.Error(err, "Error creating Kubernetes client")
 		return err
+	}
+
+	istioRunning, err := utils.DetectIstioInNamespace(ctx, instance.Namespace)
+	fmt.Printf("WAT!\n%+v\n", istioRunning)
+	if err != nil {
+		return err
+	}
+	if istioRunning {
+		istioIgnoring, err := utils.IsIstioIgnoringPod(ctx, client, instance.Namespace, instance.PodName)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("puppa!%+v\n", istioIgnoring)
 	}
 
 	metricServer, err := metricserver.New(instance)

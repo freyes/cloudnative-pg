@@ -152,6 +152,17 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"patch",
 			},
 		},
+		{
+			APIGroups: []string{
+				"",
+			},
+			Resources: []string{
+				"namespaces",
+			},
+			Verbs: []string{
+				"get",
+			},
+		},
 	}
 
 	return rbacv1.Role{

@@ -193,6 +193,12 @@ func RunController(
 		return err
 	}
 
+	// Detect if we support Istio
+	if err = utils.DetectIstioSupport(discoveryClient); err != nil {
+		setupLog.Error(err, "unable to detect Istio support")
+		return err
+	}
+
 	// Retrieve the Kubernetes cluster system UID
 	if err = utils.DetectKubeSystemUID(ctx, kubeClient); err != nil {
 		setupLog.Error(err, "unable to retrieve the Kubernetes cluster system UID")
@@ -202,7 +208,8 @@ func RunController(
 	setupLog.Info("Kubernetes system metadata",
 		"systemUID", utils.GetKubeSystemUID(),
 		"haveSCC", utils.HaveSecurityContextConstraints(),
-		"haveSeccompProfile", utils.HaveSeccompSupport())
+		"haveSeccompProfile", utils.HaveSeccompSupport(),
+		"haveIstio", utils.HaveIstio())
 
 	if err := ensurePKI(ctx, kubeClient, mgr.GetWebhookServer().CertDir); err != nil {
 		return err

@@ -17,14 +17,18 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
-	"regexp"
-	"strconv"
-
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
+	"regexp"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
 )
 
 // This variable stores the result of the DetectSecurityContextConstraints check
@@ -32,6 +36,9 @@ var haveSCC bool
 
 // This variable specifies whether we should set the SeccompProfile or not in the pods
 var supportSeccomp bool
+
+// This variable store the result of DetectIstioSupport
+var haveIstio bool
 
 // `minorVersionRegexp` is used to extract the minor version from
 // the Kubernetes API server version. Some providers, like AWS,
@@ -139,4 +146,54 @@ func DetectSeccompSupport(client *discovery.DiscoveryClient) (err error) {
 	}
 
 	return
+}
+
+// DetectIstioSupport will detect if the Istio api group exists in the current
+// Kubernetes cluster and if the resource SideCar exists.
+func DetectIstioSupport(client *discovery.DiscoveryClient) (err error) {
+	haveIstio = false
+	haveIstio, err = resourceExist(client, "networking.istio.io/v1beta1", "sidecar")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// HaveIstio returns true if this cluster has Istio deployed
+// Even having Istio deployed doesn't mean that Istio will do something to the cluster
+// That's why we need to also check if the namespace is labeled
+func HaveIstio() bool {
+	return haveIstio
+}
+
+// DetectIstioInNamespace will return true and no error in case the `namespace`
+// has the label "istio-injection=enabled"
+func DetectIstioInNamespace(ctx context.Context, namespace string) (bool, error) {
+	config := ctrl.GetConfigOrDie()
+	kubeInterface := kubernetes.NewForConfigOrDie(config)
+	namespaceObject, err := kubeInterface.CoreV1().Namespaces().Get(ctx, namespace, v1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+
+	if value, ok := namespaceObject.Labels["istio-injection"]; ok && value == "enabled" {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func IsIstioIgnoringPod(ctx context.Context, kubeClient client.Client, namespace, podName string) (bool, error) {
+	var pod corev1.Pod
+	if err := kubeClient.Get(ctx, client.ObjectKey{Name: podName, Namespace: namespace}, &pod); err != nil {
+		return false, err
+	}
+	labels := pod.Labels
+
+	if value, ok := labels["sidecar.istio.io/injec"]; ok && value == "false" {
+		return true, nil
+	}
+
+	return false, nil
 }
