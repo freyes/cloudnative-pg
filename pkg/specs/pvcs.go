@@ -188,6 +188,11 @@ func DetectPVCs(
 			continue
 		}
 
+		if cluster.ContainsWalArchiveSuffix(pvc.Name) && pvc.Status.Phase == corev1.ClaimPending {
+			result.Dangling = append(result.Dangling, pvc.Name)
+			continue
+		}
+
 		// There's no point in reattaching deleted PVCs
 		if pvc.ObjectMeta.DeletionTimestamp != nil {
 			continue

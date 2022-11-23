@@ -627,6 +627,21 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 			contextLogger.Info("cannot decrease storage requirement",
 				"from", oldQuantity, "to", quantity,
 				"pvcName", resources.pvcs.Items[idx].Name)
+
+		// The createPVC function has a check for apierrs.IsAlreadyExists
+		case cluster.ShouldCreateWalArchiveVolume():
+			nodeSerial, err := specs.GetNodeSerial(oldPVC.ObjectMeta)
+			if err != nil {
+				return err
+			}
+			err = r.createPVC(ctx, cluster, *cluster.Spec.WalStorage, nodeSerial, utils.PVCRolePgWal)
+			if err != nil {
+				return err
+			}
+			err = r.updateResourceStatus(ctx, cluster, resources)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -638,6 +653,8 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Info("ReconcilePods forwalcheking")
 
 	// If we are joining a node, we should wait for the process to finish
 	if resources.countRunningJobs() > 0 {
@@ -756,9 +773,8 @@ func (r *ClusterReconciler) handleRollingUpdate(
 
 	// If we need to roll out a restart of any instance, this is the right moment
 	// Do I have to roll out a new image?
-	done, err := r.rolloutDueToCondition(ctx, cluster, &instancesStatus, IsPodNeedingRollout)
 
-	// TODO check if the walstorage was changed and do a rollout
+	done, err := r.rolloutDueToCondition(ctx, cluster, &instancesStatus, IsPodNeedingRollout)
 
 	if err != nil {
 		return ctrl.Result{}, err
